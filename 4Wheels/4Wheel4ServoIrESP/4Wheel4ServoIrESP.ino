@@ -124,7 +124,7 @@ void loop() {
     int turn_dir    = r.yaw < 8 ? -1
                     : r.yaw > 8 ? 1
                     : 0;
-    int turn_change = r.yaw < 8 ? r.yaw : r.yaw - 8;
+    int turn_change = abs(r.yaw - 8);
     int turn_angle  = SERVO_MIDDLE;
     if (turn_change > 5) {
       turn_angle = SERVO_MIDDLE + turn_max*turn_dir;
