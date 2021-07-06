@@ -110,15 +110,30 @@ void loop() {
     int speed = map(constrain(r.thrust, 0, 126), 0, 126, ANALOG_MIN, ANALOG_MAX);
     Serial.println(r.thrust);
     int turn_max    = r.abc == 2 ? 80 : 140;
-    int turn_step   = turn_max / 7;
-    /*    int turn_angle  = r.yaw == 8   ? SERVO_MIDDLE
+    /*int turn_step   = turn_max / 7;
+        int turn_angle  = r.yaw == 8   ? SERVO_MIDDLE
                         :  r.yaw < 8    ? map(r.yaw, 1, 7, SERVO_MIDDLE - turn_max, SERVO_MIDDLE - turn_step)
                         :                 map(r.yaw, 9, 15, SERVO_MIDDLE + turn_step, SERVO_MIDDLE + turn_max)
                         ;*/
-    int turn_angle  = r.yaw < 8 ? SERVO_MIDDLE - turn_max
+    /* int turn_step   = turn_max / 7;
+      int turn_angle  = r.yaw < 8 ? SERVO_MIDDLE - turn_max
                       : r.yaw > 8 ? SERVO_MIDDLE + turn_max
                       :             SERVO_MIDDLE
-                      ;
+                      ;*/
+    int turn_step   = turn_max / 3;
+    int turn_dir    = r.yaw < 8 ? -1
+                    : r.yaw > 8 ? 1
+                    : 0;
+    int turn_change = r.yaw < 8 ? r.yaw : r.yaw - 8;
+    int turn_angle  = SERVO_MIDDLE;
+    if (turn_change > 5) {
+      turn_angle = SERVO_MIDDLE + turn_max*turn_dir;
+    } else if (turn_change > 3) {
+      turn_angle = SERVO_MIDDLE + (turn_max - turn_step)*turn_dir;
+    } else if (turn_change >= 1) {
+      turn_angle = SERVO_MIDDLE + (turn_max - 2*turn_step)*turn_dir;
+    }
+
     if (r.l || r.r) {
       turn_angle = r.l ? SERVO_MIDDLE - 160 : SERVO_MIDDLE + 160;
     }
@@ -182,7 +197,7 @@ void loop() {
 bool ir_get(unsigned long * result) {
   bool ret = false;
   decode_results decoded;
-  
+
   if (irrecv.decode(&decoded)) {
     if (decoded.rawlen == 34) {
 
