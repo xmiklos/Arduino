@@ -44,13 +44,17 @@ class Timer {
   bool tick() {
     if (_started) {
       unsigned long current_time = millis();
+//      noInterrupts();
       if (current_time - start_time >= wait_time) {
+//        interrupts();
         if (repeat) {
           restart();
         } else {
           stop();
         }
         return true; // signal wait time is over
+      } else {
+//        interrupts();
       }
     }
     return false;
