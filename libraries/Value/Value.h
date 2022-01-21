@@ -36,6 +36,19 @@ class Value {
 		val = new_val;
 	}
 	
+	void set_th(T new_val, T threshold, U origin = default_u) {
+
+		if (constrained) {
+			new_val = constrain(new_val, constrain_min, constrain_max);
+		}
+
+		if (abs(val - new_val) >= threshold) {
+			changed = true;
+			_origin = origin;
+			val = new_val;
+		}
+	}
+	
 	void inc(U origin = default_u) {
 		set( get() + 1, origin );
 	}
