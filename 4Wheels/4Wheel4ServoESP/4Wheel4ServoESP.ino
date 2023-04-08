@@ -2,6 +2,7 @@
 #include <WiFiUdp.h>
 #include <Timer.h>
 #include <Wire.h>
+#include <Value.h>
 #include <Adafruit_PWMServoDriver.h>
 
 
@@ -81,7 +82,7 @@ Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(0x40);
 WiFiUDP Udp;
 void setup() {
   Serial.begin(115200);
-  while (!Serial);
+  //while (!Serial);
   Serial.println("start");
 
   WiFi.softAP("4Wheel", "hesloveslo");
@@ -96,29 +97,38 @@ void setup() {
   pwm.setPWMFreq(50);
 }
 
-unsigned long t;
+unsigned long t = 0;
 unsigned long c = 0;
+Value<unsigned long> control_bits(0UL);
 void loop() {
   t = micros();
+
   int packetSize = Udp.parsePacket();
+
   if (packetSize == 4) {
-    Serial.println(c++);
     ulint bits;
     Udp.read((char*)&bits, 4);
-    ir_results r = bits_to_ir(bits);
+    control_bits.set(bits);
+  }
 
-    int speed = map(constrain(r.thrust, 0, 126), 0, 126, ANALOG_MIN, ANALOG_MAX);
-    Serial.println(r.thrust);
+  if (control_bits.change()) {
+
+    //Serial.println(c++);
+
+    ir_results r = bits_to_ir(control_bits.get());
+
+    int speed = map(constrain(r.thrust, 0, 128), 0, 128, ANALOG_MIN, ANALOG_MAX);
+    //Serial.println(r.thrust);
     int turn_max    = r.abc == 2 ? 80 : 140;
     int turn_step   = turn_max / 7;
-    /*    int turn_angle  = r.yaw == 8   ? SERVO_MIDDLE
-                        :  r.yaw < 8    ? map(r.yaw, 1, 7, SERVO_MIDDLE - turn_max, SERVO_MIDDLE - turn_step)
-                        :                 map(r.yaw, 9, 15, SERVO_MIDDLE + turn_step, SERVO_MIDDLE + turn_max)
-                        ;*/
-    int turn_angle  = r.yaw < 8 ? SERVO_MIDDLE - turn_max
+    int turn_angle  = r.yaw == 8   ? SERVO_MIDDLE
+                      :  r.yaw < 8    ? map(r.yaw, 1, 7, SERVO_MIDDLE - turn_max, SERVO_MIDDLE - turn_step)
+                      :                 map(r.yaw, 9, 15, SERVO_MIDDLE + turn_step, SERVO_MIDDLE + turn_max)
+                      ;
+    /*int turn_angle  = r.yaw < 8 ? SERVO_MIDDLE - turn_max
                       : r.yaw > 8 ? SERVO_MIDDLE + turn_max
                       :             SERVO_MIDDLE
-                      ;
+                      ;*/
 
     int middle_deviation = abs(SERVO_MIDDLE - turn_angle);
     double r1           = VLEN * cotg(analog2rad(middle_deviation)) + VWIDTH / 2;
@@ -146,7 +156,7 @@ void loop() {
       stop(rear_right);
     } else {                        // forward/reverse with turning
 
-      bool reverse = r.L1 || r.pitch < 8;
+      bool reverse = r.L1/* || r.pitch < 8*/;
       go(reverse, front_left,  (r.yaw < 8 && !r.light ? speed2 : speed));
       go(reverse, front_right, (r.yaw > 8 && !r.light ? speed2 : speed));
       go(reverse, rear_left,   (r.yaw < 8 && !r.light ? speed2 : speed));
@@ -167,14 +177,14 @@ void loop() {
       pwm.setPWM(REAR_LEFT_SERVO, 0, SERVO_MIDDLE + REAR_LEFT_CORRECTION);
       pwm.setPWM(REAR_RIGHT_SERVO, 0, SERVO_MIDDLE + REAR_RIGHT_CORRECTION);
     }
+
+    unsigned long diff = micros() - t;
+
+    Serial.println(diff);
   } else if (packetSize > 0) {
     Serial.println("Bad packet size!");
   }
 
-  unsigned long diff = micros() - t;
-  if (diff > 500) {
-      Serial.println(diff);
-  }
   //delay(10);
 }
 
@@ -208,7 +218,7 @@ ir_results bits_to_ir(ulint bits) {
 
   ir_results results;
 
-  if (0) { // dump bits
+  if (1) { // dump bits
     for (int i = 31; i >= 0; i--) {
       Serial.print( (bits >> i) & 1, BIN );
       if (i % 8 == 0) {
