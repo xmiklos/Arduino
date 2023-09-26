@@ -8,17 +8,17 @@
 
 #define DEBUG 1
 #define RECV_PIN 7
-#define HOLD 0xFFFFFFFF
+#define HOLD 0x0
 #define DELAY 250
 #define CLK 2
 #define DIO 3
+#define RELAY 5
 
-decode_results results;
 unsigned long last_code;
 unsigned long delay_t = DELAY;
-IRrecv irrecv(RECV_PIN);
+
 PT2258 pt2258(0x88);
-Value<int> volume(0, -79, 0, true);
+Value<int> volume(0, 0, 79, true);
 int volume_eeprom = 0;
 Timer save_timer(10000, false, false);
 TM1637Display display(CLK, DIO);
@@ -28,54 +28,60 @@ void setup() {
   Serial.println("Starting...");
   Wire.begin();  // start the I2C bus
   //Wire.setClock(100000);  // the PT2258 is specified to work with a bus clock of 100kHz
-
+  Serial.println("Begin...");
   if (!pt2258.begin()) {  // initialise the PT2258
     Serial.println("PT2258: connection error!");
     while (1) delay(10);
   }
 
-  irrecv.enableIRIn();
-  pt2258.volumeAll(-79);  // at the beginning the volume is by default at 100%. Set the desired volume at startup before unmuting next
-  pt2258.mute(false);   // the mute is active when the device powers up. Unmute it to ear the sound
+  IrReceiver.begin(RECV_PIN);
+  pt2258.volumeAll(79);
+  pt2258.mute(false);
 
   EEPROM.get(0, volume_eeprom);
   if (volume_eeprom != 0) {
     volume.set(volume_eeprom);
   }
-  display.setBrightness(0x0f);
+  display.setBrightness(2);
   display.clear();
-  display.showNumberDec(volume.get(), false, 3, 1);
+  display.showNumberDec(volume.get(), false, 2, 1);
   Serial.println("Started!");
 }
 
 void loop() {
 
-  if (irrecv.decode(&results)) {
-    if (DEBUG) Serial.println(results.value, HEX);
+  if (IrReceiver.decode()) {
+    if (DEBUG) Serial.println(IrReceiver.decodedIRData.decodedRawData, HEX);
 
-    if (results.value == HOLD) {
-      results.value = last_code;
+    if (IrReceiver.decodedIRData.decodedRawData == HOLD) {
+      IrReceiver.decodedIRData.decodedRawData = last_code;
       delay_t = 100;
     } else {
-      last_code = results.value;
+      last_code = IrReceiver.decodedIRData.decodedRawData;
       delay_t = DELAY;
     }
 
-    if (results.value == 0xC03F20DF) {  // +
-      volume.inc();
+    if (IrReceiver.decodedIRData.decodedRawData == 0xE401BF) {  // +
+      volume.set( volume.get() + 2 );
       if (DEBUG) Serial.println("Stisknuto VOL+");
-    } else if (results.value == 0xC03F10EF) {  // -
-      volume.dec();
+    } else if (IrReceiver.decodedIRData.decodedRawData == 0xD8027F) {  // -
+      volume.set( volume.get() - 2 );
       if (DEBUG) Serial.println("Stisknuto VOL-");
     }  // else mute
 
-    irrecv.resume();
+    // FF000F - RED
+    // E8017F - green
+    // D8027F - yellow
+    // E401BF - blue
+    
+
+    IrReceiver.resume();
   }
 
   if (volume.change()) {
-    pt2258.attenuationAll( volume.get() );
-    pt2258.mute(volume.get() > -79 ? false : true);
-    display.showNumberDec(volume.get(), false, 3, 1);
+    pt2258.attenuationAll( 79 - volume.get() );
+    pt2258.mute(volume.get() > 0 ? false : true);
+    display.showNumberDec(volume.get(), false, 2, 1);
     Serial.println(volume.get());
     save_timer.restart();
   }
