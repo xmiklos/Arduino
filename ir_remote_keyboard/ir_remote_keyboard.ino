@@ -2,7 +2,7 @@
 #include <IRremote.h>
 
 #define RECV_PIN 7
-#define DEBUG 0
+#define DEBUG 1
 #define HOLD 0xFFFFFFFF
 #define DELAY 250
 
