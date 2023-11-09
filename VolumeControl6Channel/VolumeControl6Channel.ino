@@ -21,6 +21,8 @@ PT2258 pt2258(0x88);
 Value<int> volume(0, 0, 79, true);
 int volume_eeprom = 0;
 Timer save_timer(10000, false, false);
+Timer relay_timer(2000, false, false);
+Timer mute_timer(2000, false, false);
 TM1637Display display(CLK, DIO);
 bool mute = false;
 bool relay_on = false;
@@ -49,14 +51,14 @@ void setup() {
   if (volume_eeprom != 0) {
     volume.set(volume_eeprom);
   }
-  display.setBrightness(2);
+  display.setBrightness(0);
   display.clear();
   display.showNumberDec(volume.get(), false, 2, 1);
   Serial.println("Started!");
 }
 
 void loop() {
-
+  
   if (irrecv.decode(&results)) {
     if (DEBUG) Serial.println(results.value, HEX);
 
@@ -82,12 +84,14 @@ void loop() {
       }
       if (DEBUG) Serial.println("Stisknuto VOL-");
 
-    } else if (results.value == 0x2B77163A) {  // mute
+    } else if (results.value == 0x2B77163A && !mute_timer.started()) {  // mute
+      mute_timer.start();
       mute = !mute;
       pt2258.mute(mute);
       if (DEBUG) Serial.println("Stisknuto Mute");
 
-    } else if (results.value == 0x4ED5545A) {  // RELAY ON/OFF
+    } else if (results.value == 0x4ED5545A && !relay_timer.started()) {  // RELAY ON/OFF
+      relay_timer.start();
       relay_on = !relay_on;
       if (relay_on) {
         digitalWrite(RELAY, LOW);
@@ -114,7 +118,8 @@ void loop() {
     volume_eeprom = volume.get();
     EEPROM.put(0, volume_eeprom);
   }
-
+  mute_timer.tick();
+  relay_timer.tick();
 
   delay(delay_t);
 }
